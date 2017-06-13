@@ -32,6 +32,7 @@ services:
       - DEBUG=False
       - QGIS_LOG_FILE=/tmp/qgis-server/qgis.log
       - QGIS_SERVER_LOG_FILE=/tmp/qgis-server/qgis-server.log
+      # Log level 0 is the lowest (catch all), 5 is the highest (only fatal error)
       - QGIS_DEBUG=5
       - QGIS_SERVER_LOG_LEVEL=5
       - QGIS_PLUGINPATH=/opt/qgis-server/plugins/
@@ -41,6 +42,7 @@ services:
     links:
       - postgis
     network_mode: "bridge"
+
 
   django:
     build: docker-geonode
@@ -60,14 +62,15 @@ services:
       - GEOSERVER_BASE_URL="http://geoserver:8080/geoserver/"
 # Should be specified in docker-compose.override.yml. Because it depends on the
 # host
-#      - ALLOWED_HOSTS=['django',]
-      - DEBUG=False
+      - ALLOWED_HOSTS=['django','geonode',]
+      - DEBUG=True
       - PYTHONPATH=/usr/src:/usr/src/app/
       - DJANGO_SETTINGS_MODULE=core.settings
       - ROOT_URLCONF=core.urls
-      - SITEURL=http://localhost/
-      - GEONODE_BASE_URL=http://nginx/
+      - SITEURL=http://geonode/
+      - GEONODE_BASE_URL=http://geonode/
       - QGIS_SERVER_URL=http://qgis-server/
+      - GEOSERVER_BASE_URL=http://geoserver:8080/geoserver/
     links:
       - postgis
       - elasticsearch
@@ -76,29 +79,34 @@ services:
       - qgis-server
     network_mode: "bridge"
 
-  nginx:
-    build: docker-nginx
-    links:
-      - django
-      - qgis-server
-#  Default exposed port.
-#  Should be specified in docker-compose.override.yml
-#    ports:
-#      - "80:80"
-    network_mode: "bridge"
+  #~ nginx:
+    #~ build: docker-nginx
+    #~ links:
+      #~ - django
+      #~ - qgis-server
+#~ #  Default exposed port.
+#~ #  Should be specified in docker-compose.override.yml
+#~ #    ports:
+#~ #      - "80:80"
+    #~ network_mode: "bridge"
 
   web:
+    # this container works by forwarding requests from nginx to uwsgi in 
+    # django container.
     image: nginx
+    ports:
+      - "80:80"
     volumes:
       - './sites-enabled:/etc/nginx/conf.d:ro'
       # I dont use volumes_from as I want to use the ro modifier
-      - '../src/geonode/geonode/static_root:/home/web/static:ro'
+      - '../src/geonode/geonode/static:/home/web/static:ro'
       - '../src/geonode/geonode/uploaded:/home/web/media:ro'
       - './logs:/var/log/nginx'
     links:
       - django
       - qgis-server
     network_mode: "bridge"
+
 
   celery:
     build: docker-geonode
@@ -127,6 +135,7 @@ services:
       - qgis-server
     network_mode: "bridge"
 
+
   inasafe-output:
     image: nginx
     volumes:
@@ -134,6 +143,7 @@ services:
     ports:
       - "8081:80"
     network_mode: "bridge"
+
 
   inasafe-headless:
     build: docker-inasafe-headless
@@ -151,8 +161,9 @@ services:
     command: /start-celery.sh prod inasafe-headless
     links:
       - rabbitmq:rabbitmq
-      - nginx:nginx
+      - web:nginx
     network_mode: "bridge"
+
 
   inasafe-headless-analysis:
     build: docker-inasafe-headless
@@ -170,5 +181,5 @@ services:
     command: /start-celery.sh prod inasafe-headless-analysis
     links:
       - rabbitmq:rabbitmq
-      - nginx:nginx
+      - web:nginx
     network_mode: "bridge"

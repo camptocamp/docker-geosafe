@@ -10,6 +10,9 @@ up:
 	# bring up the services
 	@docker-compose $(CONF_FILE) -p $(PROJECT_ID) up -d
 
+nlogs:
+	@docker-compose $(CONF_FILE) -p $(PROJECT_ID) logs
+
 default: deploy
 
 ansible-check:
@@ -82,7 +85,7 @@ setup: build
 	@echo "------------------------------------------------------------------"
 	@echo "Setup in production mode"
 	@echo "------------------------------------------------------------------"
-	@docker-compose -p $(PROJECT_ID) run geonode /setup-geonode.sh
+	@docker-compose -p $(PROJECT_ID) run django /setup-geonode.sh
 	@docker-compose -p $(PROJECT_ID) run inasafe-headless /setup-geonode.sh
 
 wait:
